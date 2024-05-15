@@ -143,7 +143,11 @@ def ipadapter_model_loader(file):
 
     return model
 
+insightface_model = None
 def insightface_loader(provider):
+    global insightface_model
+    if insightface_model is not None:
+        return insightface_model
     try:
         from insightface.app import FaceAnalysis
     except ImportError as e:
@@ -152,6 +156,7 @@ def insightface_loader(provider):
     path = os.path.join(folder_paths.models_dir, "insightface")
     model = FaceAnalysis(name="buffalo_l", root=path, providers=[provider + 'ExecutionProvider',])
     model.prepare(ctx_id=0, det_size=(640, 640))
+    insightface_model = model
     return model
 
 def encode_image_masked(clip_vision, image, mask=None, batch_size=0):

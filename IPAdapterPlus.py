@@ -152,6 +152,8 @@ def set_model_patch_replace(model, patch_kwargs, key):
     else:
         to["patches_replace"]["attn2"][key].add(ipadapter_attention, **patch_kwargs)
 
+model_cache = {}
+
 def ipadapter_execute(model,
                       ipadapter,
                       clipvision,
@@ -177,7 +179,7 @@ def ipadapter_execute(model,
     dtype = model_management.unet_dtype()
     if dtype not in [torch.float32, torch.float16, torch.bfloat16]:
         dtype = torch.float16 if model_management.should_use_fp16() else torch.float32
-
+    
     is_full = "proj.3.weight" in ipadapter["image_proj"]
     is_portrait = "proj.2.weight" in ipadapter["image_proj"] and not "proj.3.weight" in ipadapter["image_proj"] and not "0.to_q_lora.down.weight" in ipadapter["ip_adapter"]
     is_portrait_unnorm = "portraitunnorm" in ipadapter
@@ -238,9 +240,9 @@ def ipadapter_execute(model,
         image_iface = tensor_to_image(image)
         face_cond_embeds = []
         image = []
-
+        logger.info(f"ipadapter_execute inner before get insight face embedding: ")
         for i in range(image_iface.shape[0]):
-            for size in [(size, size) for size in range(640, 256, -64)]:
+            for size in [(size, size) for size in range(640, 320, -320)]:
                 insightface.det_model.input_size = size # TODO: hacky but seems to be working
                 face = insightface.get(image_iface[i])
                 if face:
@@ -258,6 +260,7 @@ def ipadapter_execute(model,
         face_cond_embeds = torch.stack(face_cond_embeds).to(device, dtype=dtype)
         image = torch.stack(image)
         del image_iface, face
+        logger.info(f"ipadapter_execute inner after get insight face embedding: ")
 
     if image is not None:
         img_cond_embeds = encode_image_masked(clipvision, image, batch_size=encode_batch_size)
@@ -336,20 +339,25 @@ def ipadapter_execute(model,
 
     if attn_mask is not None:
         attn_mask = attn_mask.to(device, dtype=dtype)
-
-    ipa = IPAdapter(
-        ipadapter,
-        cross_attention_dim=cross_attention_dim,
-        output_cross_attention_dim=output_cross_attention_dim,
-        clip_embeddings_dim=img_cond_embeds.shape[-1],
-        clip_extra_context_tokens=clip_extra_context_tokens,
-        is_sdxl=is_sdxl,
-        is_plus=is_plus,
-        is_full=is_full,
-        is_faceid=is_faceid,
-        is_portrait_unnorm=is_portrait_unnorm,
-    ).to(device, dtype=dtype)
-
+    logger.info(f"ipadapter_execute inner before IPAdapter to device: ")
+    key = f"{cross_attention_dim}_{output_cross_attention_dim}_{img_cond_embeds.shape[-1]}_{clip_extra_context_tokens}"
+    if key not in model_cache:
+        ipa = IPAdapter(
+            ipadapter,
+            cross_attention_dim=cross_attention_dim,
+            output_cross_attention_dim=output_cross_attention_dim,
+            clip_embeddings_dim=img_cond_embeds.shape[-1],
+            clip_extra_context_tokens=clip_extra_context_tokens,
+            is_sdxl=is_sdxl,
+            is_plus=is_plus,
+            is_full=is_full,
+            is_faceid=is_faceid,
+            is_portrait_unnorm=is_portrait_unnorm,
+        ).to(device, dtype=dtype)
+        model_cache[key]=ipa
+    else:
+        ipa = model_cache[key]
+    logger.info(f"ipadapter_execute inner before get_image_embeds_faceid_plus: ")
     if is_faceid and is_plus:
         cond = ipa.get_image_embeds_faceid_plus(face_cond_embeds, img_cond_embeds, weight_faceidv2, is_faceidv2)
         # TODO: check if noise helps with the uncond face embeds
@@ -619,6 +627,8 @@ class IPAdapterSimple:
 
         return ipadapter_execute(model.clone(), ipadapter['ipadapter']['model'], ipadapter['clipvision']['model'], **ipa_args)
 
+import logging
+logger = logging.getLogger(__file__)
 class IPAdapterAdvanced:
     def __init__(self):
         self.unfold_batch = False
@@ -650,7 +660,7 @@ class IPAdapterAdvanced:
 
     def apply_ipadapter(self, model, ipadapter, start_at=0.0, end_at=1.0, weight=1.0, weight_style=1.0, weight_composition=1.0, expand_style=False, weight_type="linear", combine_embeds="concat", weight_faceidv2=None, image=None, image_style=None, image_composition=None, image_negative=None, clip_vision=None, attn_mask=None, insightface=None, embeds_scaling='V only', layer_weights=None, ipadapter_params=None, encode_batch_size=0):
         is_sdxl = isinstance(model.model, (comfy.model_base.SDXL, comfy.model_base.SDXLRefiner, comfy.model_base.SDXL_instructpix2pix))
-
+        logger.info(f"apply_ipadapter start: ")
         if 'ipadapter' in ipadapter:
             ipadapter_model = ipadapter['ipadapter']['model']
             clip_vision = clip_vision if clip_vision is not None else ipadapter['clipvision']['model']
@@ -709,7 +719,7 @@ class IPAdapterAdvanced:
             }
 
             work_model, face_image = ipadapter_execute(work_model, ipadapter_model, clip_vision, **ipa_args)
-
+            logger.info(f"apply_ipadapter ipadapter_execute end: ")
         del ipadapter
         return (work_model, face_image, )
 
