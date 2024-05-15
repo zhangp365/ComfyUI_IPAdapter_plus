@@ -242,7 +242,7 @@ def ipadapter_execute(model,
         image = []
         logger.info(f"ipadapter_execute inner before get insight face embedding: ")
         for i in range(image_iface.shape[0]):
-            for size in [(size, size) for size in range(640, 320, -320)]:
+            for size in [(size, size) for size in range(640, 310, -320)]:
                 insightface.det_model.input_size = size # TODO: hacky but seems to be working
                 face = insightface.get(image_iface[i])
                 if face:
