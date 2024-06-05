@@ -839,6 +839,7 @@ class IPAdapterFaceID(IPAdapterAdvanced):
                 "attn_mask": ("MASK",),
                 "clip_vision": ("CLIP_VISION",),
                 "insightface": ("INSIGHTFACE",),
+                "face_model": ("FACE_MODEL",),
             }
         }
 
