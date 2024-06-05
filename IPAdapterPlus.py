@@ -174,7 +174,8 @@ def ipadapter_execute(model,
                       unfold_batch=False,
                       embeds_scaling='V only',
                       layer_weights=None,
-                      encode_batch_size=0,):
+                      encode_batch_size=0,
+                      face_models= []):
     device = model_management.get_torch_device()
     dtype = model_management.unet_dtype()
     if dtype not in [torch.float32, torch.float16, torch.bfloat16]:
@@ -243,8 +244,12 @@ def ipadapter_execute(model,
         logger.info(f"ipadapter_execute inner before get insight face embedding: ")
         for i in range(image_iface.shape[0]):
             for size in [(size, size) for size in range(640, 310, -320)]:
-                insightface.det_model.input_size = size # TODO: hacky but seems to be working
-                face = insightface.get(image_iface[i])
+                if i < len(face_models):
+                    face = [face_models[i]]
+                    logger.info("use external face model.")
+                else:
+                    insightface.det_model.input_size = size # TODO: hacky but seems to be working
+                    face = insightface.get(image_iface[i])
                 if face:
                     if not is_portrait_unnorm:
                         face_cond_embeds.append(torch.from_numpy(face[0].normed_embedding).unsqueeze(0))
@@ -652,6 +657,7 @@ class IPAdapterAdvanced:
                 "attn_mask": ("MASK",),
                 "clip_vision": ("CLIP_VISION",),
                 "enabled": ("BOOLEAN", {"default": True, "label_on": "enabled", "label_off": "disabled"}),
+                "face_model": ("FACE_MODEL",),
             }
         }
 
@@ -659,7 +665,7 @@ class IPAdapterAdvanced:
     FUNCTION = "apply_ipadapter"
     CATEGORY = "ipadapter"
 
-    def apply_ipadapter(self, model, ipadapter, start_at=0.0, end_at=1.0, weight=1.0, weight_style=1.0, weight_composition=1.0, expand_style=False, weight_type="linear", combine_embeds="concat", weight_faceidv2=None, image=None, image_style=None, image_composition=None, image_negative=None, clip_vision=None, attn_mask=None, insightface=None, embeds_scaling='V only', layer_weights=None, ipadapter_params=None, encode_batch_size=0, enabled=True):
+    def apply_ipadapter(self, model, ipadapter, start_at=0.0, end_at=1.0, weight=1.0, weight_style=1.0, weight_composition=1.0, expand_style=False, weight_type="linear", combine_embeds="concat", weight_faceidv2=None, image=None, image_style=None, image_composition=None, image_negative=None, clip_vision=None, attn_mask=None, insightface=None, embeds_scaling='V only', layer_weights=None, ipadapter_params=None, encode_batch_size=0, enabled=True,face_model=None):
         if image is None or not enabled:
             return(model, torch.zeros((1,64,64,3)),)
 
@@ -695,6 +701,13 @@ class IPAdapterAdvanced:
             # at this point weight can be a list from the batch-weight or a single float
             weight = [weight]
 
+        face_models = []
+        if face_model is not None:
+            if isinstance(face_model,list):
+                face_models = face_model
+            else:
+                face_models =[face_model]
+
         image = image if isinstance(image, list) else [image]
 
         work_model = model.clone()
@@ -720,6 +733,7 @@ class IPAdapterAdvanced:
                 "insightface": insightface if insightface is not None else ipadapter['insightface']['model'] if 'insightface' in ipadapter else None,
                 "layer_weights": layer_weights,
                 "encode_batch_size": encode_batch_size,
+                "face_models": face_models,
             }
 
             work_model, face_image = ipadapter_execute(work_model, ipadapter_model, clip_vision, **ipa_args)
