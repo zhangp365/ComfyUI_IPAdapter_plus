@@ -27,6 +27,14 @@ Please consider a [Github Sponsorship](https://github.com/sponsors/cubiq) or [Pa
 
 ## Important updates
 
+**2024/07/11**: Added experimental Precise composition (layout) transfer. It's not as good as style. `embeds_scaling` has a huge impact. Start with strength 0.8 and boost 0.3 in SDXL and 0.6 boost 0.35 in SD1.5.
+
+**2024/06/28**: Added the `IPAdapter Precise Style Transfer` node. Increase the `style_boost` option to lower the bleeding of the composition layer. **Important:** works better in SDXL, start with a style_boost of 2; for SD1.5 try to increase the weight a little over 1.0 and set the style_boost to a value between -1 and +1, starting with 0.
+
+**2024/06/22**: Added `style transfer precise`, offers less bleeding of the embeds between the style and composition layers. It is sometimes better than the standard style transfer especially if the reference image is very different from the generated image. Works better in SDXL than SD1.5.
+
+**2024/05/21**: Improved memory allocation when `encode_batch_size`. Useful mostly for very long animations.
+
 **2024/05/02**: Add `encode_batch_size` to the Advanced batch node. This can be useful for animations with a lot of frames to reduce the VRAM usage during the image encoding. Please note that results will be slightly different based on the batch size.
 
 **2024/04/27**: Refactored the IPAdapterWeights mostly useful for AnimateDiff animations.
@@ -41,13 +49,7 @@ Please consider a [Github Sponsorship](https://github.com/sponsors/cubiq) or [Pa
 
 **2024/04/04**: Added Style & Composition node. It's now possible to apply both Style and Composition from the same node
 
-**2024/04/01**: Added Composition only transfer weight type for SDXL
-
-**2024/03/27**: Added Style transfer weight type for SDXL
-
-**2024/03/23**: Complete code rewrite! **This is a breaking update!** Your previous workflows won't work and you'll need to recreate them. You've been warned! After the update, refresh your browser, delete the old IPAdapter nodes and create the new ones.
-
-*(I removed old updates related to the previous version of the extension)*
+*(Older updates removed for readability)*
 
 ## Example workflows
 
@@ -152,7 +154,7 @@ It's only thanks to generous sponsors that **the whole community** can enjoy ope
 
 ### :tada: Silver sponsors
 
-[![OperArt.ai](https://f.latent.vision/imgs/openart.png?r=1)](https://openart.ai/workflows)
+[![OperArt.ai](https://f.latent.vision/imgs/openart.png?r=1)](https://openart.ai/workflows)&nbsp; &nbsp;[![OperArt.ai](https://f.latent.vision/imgs/finetuners.png)](https://www.finetuners.ai/)
 
 ### Companies supporting my projects
 
