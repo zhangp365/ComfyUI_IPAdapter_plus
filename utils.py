@@ -9,6 +9,8 @@ try:
     import torchvision.transforms.v2 as T
 except ImportError:
     import torchvision.transforms as T
+import logging
+logger = logging.getLogger(__file__)
 
 def get_clipvision_file(preset):
     preset = preset.lower()
@@ -278,8 +280,14 @@ def encode_image_masked(clip_vision, image, mask=None, batch_size=0, tiles=1, ra
 
     return embeds
 
+
+loaded_patcher = set()
 def encode_image_masked_(clip_vision, image, mask=None, batch_size=0, clipvision_size=224):
-    model_management.load_model_gpu(clip_vision.patcher)
+    logger.debug("before model_management.load_model_gpu(clip_vision.patcher)")
+    if clip_vision.patcher not in loaded_patcher:
+        model_management.load_model_gpu(clip_vision.patcher)
+        loaded_patcher.add(clip_vision.patcher)
+    logger.debug("after model_management.load_model_gpu(clip_vision.patcher)")
     outputs = Output()
 
     if batch_size == 0:
