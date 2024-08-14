@@ -138,8 +138,12 @@ def ipadapter_model_loader(file):
                 st_model["image_proj"][key.replace("image_proj.", "")] = model[key]
             elif key.startswith("ip_adapter."):
                 st_model["ip_adapter"][key.replace("ip_adapter.", "")] = model[key]
+            elif key.startswith("adapter_modules."):
+                st_model["ip_adapter"][key.replace("adapter_modules.", "")] = model[key]
         model = st_model
         del st_model
+    elif "adapter_modules" in model.keys():
+        model["ip_adapter"] = model.pop("adapter_modules")
 
     if not "ip_adapter" in model.keys() or not model["ip_adapter"]:
         raise Exception("invalid IPAdapter model {}".format(file))
@@ -153,7 +157,7 @@ def ipadapter_model_loader(file):
     return model
 
 insightface_model = None
-def insightface_loader(provider):
+def insightface_loader(provider, model_name='buffalo_l'):
     global insightface_model
     if insightface_model is not None:
         return insightface_model
@@ -163,7 +167,7 @@ def insightface_loader(provider):
         raise Exception(e)
 
     path = os.path.join(folder_paths.models_dir, "insightface")
-    model = FaceAnalysis(name="buffalo_l", root=path, providers=[provider + 'ExecutionProvider',])
+    model = FaceAnalysis(name=model_name, root=path, providers=[provider + 'ExecutionProvider',])
     model.prepare(ctx_id=0, det_size=(640, 640))
     insightface_model = model
     return model
