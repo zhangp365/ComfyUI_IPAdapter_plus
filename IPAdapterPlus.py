@@ -2,6 +2,7 @@ import torch
 import os
 import math
 import folder_paths
+import copy
 
 import comfy.model_management as model_management
 from node_helpers import conditioning_set_values
@@ -70,6 +71,22 @@ class IPAdapter(nn.Module):
 
         self.image_proj_model.load_state_dict(ipadapter_model["image_proj"])
         self.ip_layers = To_KV(ipadapter_model["ip_adapter"], encoder_hid_proj=encoder_hid_proj, weight_kolors=weight_kolors)
+
+        self.multigpu_clones = {}
+
+    def create_multigpu_clone(self, device):
+        if device not in self.multigpu_clones:
+            orig_multigpu_clones = self.multigpu_clones
+            try:
+                self.multigpu_clones = {}
+                new_clone = copy.deepcopy(self)
+                new_clone = new_clone.to(device)
+                orig_multigpu_clones[device] = new_clone
+            finally:
+                self.multigpu_clones = orig_multigpu_clones
+
+    def get_multigpu_clone(self, device):
+        return self.multigpu_clones.get(device, self)
 
     def init_proj(self):
         image_proj_model = ImageProjModel(
@@ -513,7 +530,7 @@ def ipadapter_execute(model,
             set_model_patch_replace(model, patch_kwargs, ("output", id))
             number += 1
         patch_kwargs["module_key"] = str(number*2+1)
-        set_model_patch_replace(model, patch_kwargs, ("middle", 0))
+        set_model_patch_replace(model, patch_kwargs, ("middle", 1))
     else:
         for id in [4,5,7,8]: # id of input_blocks that have cross attention
             block_indices = range(2) if id in [4, 5] else range(10) # transformer_depth
@@ -529,7 +546,7 @@ def ipadapter_execute(model,
                 number += 1
         for index in range(10):
             patch_kwargs["module_key"] = str(number*2+1)
-            set_model_patch_replace(model, patch_kwargs, ("middle", 0, index))
+            set_model_patch_replace(model, patch_kwargs, ("middle", 1, index))
             number += 1
 
     return (model, image)
